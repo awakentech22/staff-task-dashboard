@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { app } = require('@azure/functions');
 const { buildDashboard } = require('../lib/dashboard');
+const { isViewer } = require('../lib/roles');
 
 const STAFF_FILE = path.join(__dirname, '..', '..', 'staff.json');
 const CACHE_SECONDS = Number(process.env.CACHE_SECONDS) > 0 ? Number(process.env.CACHE_SECONDS) : 60;
@@ -18,14 +19,13 @@ function loadPeople() {
 }
 
 /** Static Web Apps forwards the signed-in user in this header. */
-function callerRoles(request) {
+function callerPrincipal(request) {
   try {
     const header = request.headers.get('x-ms-client-principal');
-    if (!header) return [];
-    const principal = JSON.parse(Buffer.from(header, 'base64').toString('utf8'));
-    return Array.isArray(principal.userRoles) ? principal.userRoles : [];
+    if (!header) return null;
+    return JSON.parse(Buffer.from(header, 'base64').toString('utf8'));
   } catch (err) {
-    return [];
+    return null;
   }
 }
 
@@ -50,12 +50,14 @@ async function getDashboard(context) {
 
 app.http('tasks', {
   methods: ['GET'],
-  authLevel: 'anonymous', // Access is enforced by staticwebapp.config.json (role "viewer").
+  authLevel: 'anonymous', // Sign-in is enforced by staticwebapp.config.json; the viewer list is enforced below.
   route: 'tasks',
   handler: async (request, context) => {
-    // Belt and braces: the route rule already requires this role.
-    if (!callerRoles(request).includes('viewer')) {
-      return { status: 403, jsonBody: { error: 'Forbidden' } };
+    const principal = callerPrincipal(request);
+    if (!principal) return { status: 401, jsonBody: { error: 'SIGN_IN_REQUIRED' } };
+    if (!isViewer(principal, process.env.VIEWER_EMAILS)) {
+      // Echo the caller's own sign-in name back so they can tell an admin what to add.
+      return { status: 403, jsonBody: { error: 'NOT_ON_VIEWER_LIST', signedInAs: principal.userDetails || null } };
     }
     try {
       const payload = await getDashboard(context);
