@@ -229,6 +229,19 @@
         credentials: 'same-origin',
       });
       if (response.status === 401) { window.location.assign('/login'); return; }
+      if (response.status === 403) {
+        const body = await response.json().catch(() => ({}));
+        data = null;
+        peopleEl.replaceChildren();
+        updatedEl.textContent = '';
+        setMessage(
+          body.signedInAs
+            ? `You’re signed in as ${body.signedInAs}, but that account isn’t on the viewer list. Ask the person who manages this dashboard to add it.`
+            : 'This account isn’t on the viewer list. Ask the person who manages this dashboard to add it.',
+          true
+        );
+        return;
+      }
       if (!response.ok) throw new Error(`Request failed (${response.status})`);
       data = await response.json();
       loadedAt = Date.now();
