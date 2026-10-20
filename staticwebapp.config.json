@@ -1,6 +1,5 @@
 {
   "auth": {
-    "rolesSource": "/api/GetRoles",
     "identityProviders": {
       "azureActiveDirectory": {
         "userDetailsClaim": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name",
@@ -13,13 +12,12 @@
     }
   },
   "routes": [
-    { "route": "/api/GetRoles", "allowedRoles": ["anonymous"] },
     { "route": "/403.html", "allowedRoles": ["anonymous"] },
     { "route": "/403.css", "allowedRoles": ["anonymous"] },
     { "route": "/login", "rewrite": "/.auth/login/aad" },
     { "route": "/logout", "redirect": "/.auth/logout" },
-    { "route": "/api/*", "allowedRoles": ["viewer"] },
-    { "route": "/*", "allowedRoles": ["viewer"] }
+    { "route": "/api/*", "allowedRoles": ["authenticated"] },
+    { "route": "/*", "allowedRoles": ["authenticated"] }
   ],
   "responseOverrides": {
     "401": {
