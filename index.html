@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Staff tasks | Awaken LV</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="top">
+    <div class="top-inner">
+      <div class="heading">
+        <h1>Staff tasks</h1>
+        <p class="source">Live from Microsoft Planner</p>
+      </div>
+      <div class="actions">
+        <label class="toggle">
+          <input type="checkbox" id="show-done">
+          <span>Show recently completed</span>
+        </label>
+        <button type="button" class="btn" id="refresh">Refresh</button>
+        <span id="updated" class="updated" role="status" aria-live="polite"></span>
+        <a class="signout" href="/.auth/logout">Sign out</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="board" aria-busy="true">
+    <p id="message" class="message" role="status">Loading tasks…</p>
+    <div id="people" class="people"></div>
+  </main>
+</body>
+</html>

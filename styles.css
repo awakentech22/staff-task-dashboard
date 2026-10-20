@@ -1,0 +1,216 @@
+/* Awaken Las Vegas palette. Suiza is the brand face; add its font files and an
+   @font-face rule below once licensed. Until then the stack falls back cleanly. */
+:root {
+  --ink: #292929;
+  --paper: #ffffff;
+  --ember: #df6b48;
+  --ember-text: #b8461f; /* ember darkened to pass contrast for small text */
+  --stone: #98a9b1;
+  --sand: #cab492;
+  --bone: #e0d8cc;
+  --muted: #5e5e5e;
+  --line: rgba(41, 41, 41, 0.14);
+  --font: "Suiza", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
+
+/* Header */
+.top {
+  background: var(--ink);
+  color: #ffffff;
+  padding: 1.25rem clamp(1rem, 4vw, 3rem);
+}
+.top-inner {
+  max-inline-size: 90rem;
+  margin-inline: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 2rem;
+}
+.top h1 {
+  margin: 0;
+  font-size: clamp(1.5rem, 1.1rem + 1.6vw, 2.25rem);
+  line-height: 0.95;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+}
+.source { margin: 0.4rem 0 0; font-size: 0.875rem; color: var(--bone); }
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+  font-size: 0.9375rem;
+}
+.toggle { display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; }
+.toggle input { inline-size: 1.05rem; block-size: 1.05rem; accent-color: var(--ember); }
+
+.btn {
+  appearance: none;
+  font: inherit;
+  font-weight: 600;
+  color: #ffffff;
+  background: transparent;
+  border: 1px solid #ffffff;
+  border-radius: 999px;
+  padding: 0.45rem 1.1rem;
+  cursor: pointer;
+  transition: background-color 240ms var(--ease), color 240ms var(--ease);
+}
+.btn:hover { background: #ffffff; color: var(--ink); }
+.btn[disabled] { opacity: 0.4; cursor: not-allowed; }
+.btn[disabled]:hover { background: transparent; color: #ffffff; }
+
+.updated { color: var(--bone); min-inline-size: 8.5rem; }
+.signout { color: #ffffff; text-underline-offset: 0.2em; }
+.signout:hover { text-decoration-thickness: 2px; }
+
+/* Board */
+main {
+  max-inline-size: 90rem;
+  margin-inline: auto;
+  padding: 2rem clamp(1rem, 4vw, 3rem) 4rem;
+}
+.message { margin: 0 0 1.5rem; color: var(--muted); }
+.message:empty { display: none; }
+.message.is-error { color: var(--ember-text); font-weight: 600; }
+
+.people {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: 2.5rem 2rem;
+  align-items: start;
+}
+
+.person { container-type: inline-size; min-inline-size: 0; }
+
+.person-head { padding-block-end: 1.1rem; border-block-end: 1px solid var(--line); }
+.person h2 {
+  margin: 0;
+  font-size: 1.375rem;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+}
+.count { margin: 0.45rem 0 0.9rem; color: var(--muted); font-size: 0.9375rem; }
+
+/* The load line: one bar showing how a person's open work splits by urgency. */
+.load {
+  display: flex;
+  gap: 2px;
+  block-size: 0.75rem;
+  background: var(--line);
+}
+.seg { min-inline-size: 6px; flex: 1 1 0; }
+.seg-overdue { background: var(--ember); }
+.seg-week { background: var(--ink); }
+.seg-later { background: var(--stone); }
+.seg-none { background: var(--sand); }
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.1rem;
+  margin: 0.7rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+.legend li { display: inline-flex; align-items: center; gap: 0.4rem; }
+.swatch { inline-size: 0.65rem; block-size: 0.65rem; flex: none; }
+.swatch-overdue { background: var(--ember); }
+.swatch-week { background: var(--ink); }
+.swatch-later { background: var(--stone); }
+.swatch-none { background: var(--sand); }
+
+/* Task groups */
+.group { margin-block-start: 1.6rem; }
+.group h3 {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0 0 0.15rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.group-overdue h3 { color: var(--ember-text); }
+
+.tasks { margin: 0; padding: 0; list-style: none; }
+.task {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.25rem 1rem;
+  padding-block: 0.85rem;
+  border-block-end: 1px solid var(--line);
+}
+.title { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.where {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 0.9rem;
+  margin: 0.15rem 0 0;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+.bucket { color: var(--muted); font-style: italic; }
+
+.side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+  text-align: end;
+  font-size: 0.875rem;
+}
+.due { font-weight: 700; white-space: nowrap; }
+.rel { color: var(--muted); }
+.is-overdue .rel { color: var(--ember-text); font-weight: 600; }
+.flag { font-weight: 700; }
+.flag-urgent { color: var(--ember-text); }
+.progress { color: var(--muted); }
+
+.is-done .title { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; }
+
+.empty { margin: 1.25rem 0 0; color: var(--muted); }
+
+.notice {
+  margin-block-start: 1.25rem;
+  padding: 1rem 1.1rem;
+  background: var(--bone);
+  color: var(--ink);
+  font-size: 0.9375rem;
+}
+.notice strong { display: block; margin-block-end: 0.2rem; }
+
+@container (width < 20rem) {
+  .task { grid-template-columns: minmax(0, 1fr); }
+  .side { flex-direction: row; flex-wrap: wrap; align-items: baseline; text-align: start; gap: 0.15rem 1rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}

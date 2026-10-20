@@ -1,0 +1,16 @@
+{
+  "name": "staff-task-dashboard-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Managed API for the Awaken staff task dashboard (Microsoft Planner via Microsoft Graph).",
+  "main": "src/functions/*.js",
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.5.0"
+  }
+}
