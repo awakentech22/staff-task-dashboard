@@ -2,7 +2,7 @@
   "auth": {
     "identityProviders": {
       "azureActiveDirectory": {
-        "userDetailsClaim": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name",
+        "userDetailsClaim": "preferred_username",
         "registration": {
           "openIdIssuer": "https://login.microsoftonline.com/c8a07bc3-1bfe-4411-b3ae-a8828fb73d9a/v2.0",
           "clientIdSettingName": "AAD_CLIENT_ID",
@@ -12,15 +12,28 @@
     }
   },
   "routes": [
+    { "route": "/403.html", "allowedRoles": ["anonymous"] },
+    { "route": "/403.css", "allowedRoles": ["anonymous"] },
     { "route": "/login", "rewrite": "/.auth/login/aad" },
     { "route": "/logout", "redirect": "/.auth/logout" },
+    { "route": "/api/*", "allowedRoles": ["authenticated"] },
     { "route": "/*", "allowedRoles": ["authenticated"] }
   ],
   "responseOverrides": {
     "401": {
       "redirect": "/.auth/login/aad?post_login_redirect_uri=.referrer",
       "statusCode": 302
+    },
+    "403": {
+      "rewrite": "/403.html",
+      "statusCode": 403
     }
+  },
+  "globalHeaders": {
+    "Cache-Control": "no-store",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "same-origin",
+    "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'self'"
   },
   "platform": {
     "apiRuntime": "node:20"
