@@ -71,14 +71,14 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function graphGet(pathOrUrl) {
+async function graphGet(pathOrUrl, extraHeaders = {}) {
   // Only ever send the bearer token to Graph itself, including for nextLink URLs.
   const url = pathOrUrl.startsWith('https://') ? pathOrUrl : `${GRAPH_BASE}${pathOrUrl}`;
   if (!url.startsWith(`${GRAPH_ROOT}/`)) throw new Error('Refusing to call a non-Graph URL');
 
   for (let attempt = 0; ; attempt += 1) {
     const token = await getToken();
-    const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    const response = await fetch(url, { headers: { Authorization: `Bearer ${token}`, ...extraHeaders } });
     if (response.ok) return response.json();
 
     if ((response.status === 429 || response.status >= 500) && attempt < 2) {
@@ -121,6 +121,39 @@ async function cachedName(kind, id, path, field) {
   return value;
 }
 
+/**
+ * Finds people in the directory by name or email. Needs the User.Read.All
+ * application permission. Directory search requires ConsistencyLevel: eventual.
+ */
+function buildUserSearch(term) {
+  const tokens = String(term)
+    .split(/\s+/)
+    .map((token) => token.replace(/[^\p{L}\p{N}@._'-]/gu, ''))
+    .filter(Boolean)
+    .slice(0, 4);
+  if (tokens.length === 0) return null;
+  if (tokens.length === 1) {
+    const t = tokens[0];
+    return `"displayName:${t}" OR "mail:${t}" OR "userPrincipalName:${t}"`;
+  }
+  return tokens.map((t) => `"displayName:${t}"`).join(' AND ');
+}
+
+async function searchUsers(term) {
+  const search = buildUserSearch(term);
+  if (!search) return [];
+  const query = `$search=${encodeURIComponent(search)}&$select=id,displayName,mail,userPrincipalName,jobTitle&$top=10&$count=true`;
+  const data = await graphGet(`/users?${query}`, { ConsistencyLevel: 'eventual' });
+  return (data.value || [])
+    .filter((user) => user.id && (user.mail || user.userPrincipalName) && !String(user.userPrincipalName || '').includes('#EXT#'))
+    .map((user) => ({
+      key: user.id,
+      name: user.displayName || user.mail || user.userPrincipalName,
+      email: user.mail || user.userPrincipalName,
+      title: user.jobTitle || null,
+    }));
+}
+
 const getPlanTitle = (planId) => cachedName('plan', planId, `/planner/plans/${encodeURIComponent(planId)}`, 'title');
 const getBucketTitle = (bucketId) => cachedName('bucket', bucketId, `/planner/buckets/${encodeURIComponent(bucketId)}`, 'name');
 
@@ -130,4 +163,4 @@ function resetCaches() {
   nameCache.clear();
 }
 
-module.exports = { listUserTasks, getPlanTitle, getBucketTitle, resetCaches };
+module.exports = { listUserTasks, getPlanTitle, getBucketTitle, searchUsers, buildUserSearch, resetCaches };
