@@ -206,6 +206,64 @@ main {
 }
 .notice strong { display: block; margin-block-end: 0.2rem; }
 
+/* People picker */
+.btn-solid { background: var(--ink); color: #ffffff; border-color: var(--ink); }
+.btn-solid:hover { background: #ffffff; color: var(--ink); }
+.btn-quiet { color: var(--ink); border-color: var(--ink); }
+.btn-quiet:hover { background: var(--ink); color: #ffffff; }
+.btn-small { padding: 0.3rem 0.9rem; font-size: 0.875rem; }
+.picker-inner .btn { color: var(--ink); border-color: var(--ink); }
+.picker-inner .btn:hover { background: var(--ink); color: #ffffff; }
+.picker-inner .btn-solid { color: #ffffff; }
+.picker-inner .btn-solid:hover { background: #ffffff; color: var(--ink); }
+.picker-inner .btn[disabled]:hover { background: transparent; color: var(--ink); }
+
+#picker {
+  inline-size: min(34rem, calc(100vw - 2rem));
+  max-block-size: calc(100vh - 3rem);
+  padding: 0;
+  border: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font);
+}
+#picker::backdrop { background: rgba(41, 41, 41, 0.62); }
+.picker-inner { padding: 1.5rem; }
+.picker-top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-block-end: 1.25rem; }
+.picker-top h2 { margin: 0; font-size: 1.375rem; line-height: 1; font-weight: 800; letter-spacing: -0.02em; text-transform: uppercase; }
+.picker-label { display: block; margin-block-end: 0.35rem; font-weight: 600; font-size: 0.9375rem; }
+.picker-input {
+  inline-size: 100%;
+  font: inherit;
+  padding: 0.6rem 0.75rem;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  border-radius: 0;
+}
+.picker-status { min-block-size: 1.5rem; margin: 0.4rem 0 0.25rem; font-size: 0.875rem; color: var(--muted); }
+.picker-heading {
+  margin: 1.25rem 0 0.15rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.picker-list { margin: 0; padding: 0; list-style: none; }
+.picker-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-block: 0.65rem;
+  border-block-end: 1px solid var(--line);
+}
+.picker-name { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.picker-sub { margin: 0.1rem 0 0; font-size: 0.8125rem; color: var(--muted); overflow-wrap: anywhere; }
+.picker-empty { margin: 0.65rem 0 0; color: var(--muted); font-size: 0.9375rem; }
+.picker-foot { margin-block-start: 1.5rem; }
+
 @container (width < 20rem) {
   .task { grid-template-columns: minmax(0, 1fr); }
   .side { flex-direction: row; flex-wrap: wrap; align-items: baseline; text-align: start; gap: 0.15rem 1rem; }
