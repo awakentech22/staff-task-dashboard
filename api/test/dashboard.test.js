@@ -6,7 +6,7 @@ process.env.GRAPH_TENANT_ID = 'tenant';
 process.env.GRAPH_CLIENT_ID = 'client';
 process.env.GRAPH_CLIENT_SECRET = 'secret';
 
-const { buildDashboard } = require('../src/lib/dashboard');
+const { buildDashboard, clearPersonCache } = require('../src/lib/dashboard');
 const { resetCaches } = require('../src/lib/graph');
 
 function json(status, body, headers = {}) {
@@ -15,6 +15,7 @@ function json(status, body, headers = {}) {
 
 test('builds per-person results, enriches names, isolates failures', async () => {
   resetCaches();
+  clearPersonCache();
   const calls = [];
   global.fetch = async (url, options = {}) => {
     calls.push(String(url));
@@ -35,7 +36,7 @@ test('builds per-person results, enriches names, isolates failures', async () =>
   };
 
   const result = await buildDashboard({
-    people: [{ name: 'Ann', email: 'ann@x.org' }, { name: 'Nobody', email: 'nobody@x.org' }],
+    people: [{ key: 'ann@x.org', name: 'Ann', email: 'ann@x.org' }, { key: 'nobody@x.org', name: 'Nobody', email: 'nobody@x.org' }],
     completedDays: 14,
     now: Date.parse('2026-10-20T12:00:00Z'),
   });
@@ -54,10 +55,11 @@ test('builds per-person results, enriches names, isolates failures', async () =>
 
 test('missing settings surface as a CONFIG error per person', async () => {
   resetCaches();
+  clearPersonCache();
   const saved = process.env.GRAPH_CLIENT_SECRET;
   delete process.env.GRAPH_CLIENT_SECRET;
   global.fetch = async () => { throw new Error('should not be called'); };
-  const result = await buildDashboard({ people: [{ name: 'Ann', email: 'ann@x.org' }] });
+  const result = await buildDashboard({ people: [{ key: 'ann@x.org', name: 'Ann', email: 'ann@x.org' }] });
   assert.equal(result.people[0].error.code, 'CONFIG');
   assert.match(result.people[0].error.message, /GRAPH_CLIENT_SECRET/);
   process.env.GRAPH_CLIENT_SECRET = saved;
@@ -65,10 +67,26 @@ test('missing settings surface as a CONFIG error per person', async () => {
 
 test('never sends the bearer token to a non-Graph nextLink', async () => {
   resetCaches();
+  clearPersonCache();
   global.fetch = async (url) => {
     if (String(url).includes('/oauth2/v2.0/token')) return json(200, { access_token: 'tok', expires_in: 3600 });
     return json(200, { value: [], '@odata.nextLink': 'https://evil.example.com/steal' });
   };
-  const result = await buildDashboard({ people: [{ name: 'Ann', email: 'ann@x.org' }] });
+  const result = await buildDashboard({ people: [{ key: 'ann@x.org', name: 'Ann', email: 'ann@x.org' }] });
   assert.equal(result.people[0].error.code, 'UNKNOWN');
+});
+
+test('per-person results are cached between requests', async () => {
+  resetCaches();
+  clearPersonCache();
+  let taskCalls = 0;
+  global.fetch = async (url) => {
+    if (String(url).includes('/oauth2/v2.0/token')) return json(200, { access_token: 'tok', expires_in: 3600 });
+    if (url.includes('/planner/tasks')) { taskCalls += 1; return json(200, { value: [] }); }
+    throw new Error(`Unexpected URL ${url}`);
+  };
+  const people = [{ key: 'ann@x.org', name: 'Ann', email: 'ann@x.org' }];
+  await buildDashboard({ people, ttlMs: 60000 });
+  await buildDashboard({ people, ttlMs: 60000 });
+  assert.equal(taskCalls, 1);
 });
