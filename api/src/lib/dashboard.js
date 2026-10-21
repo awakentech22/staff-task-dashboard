@@ -3,6 +3,13 @@
 const { listUserTasks, getPlanTitle, getBucketTitle } = require('./graph');
 const { shapeTask, selectTasks } = require('./shape');
 
+const MAX_CACHE_ENTRIES = 200;
+const personCache = new Map(); // lowercased key -> { at, promise }
+
+function clearPersonCache() {
+  personCache.clear();
+}
+
 async function mapLimit(items, limit, fn) {
   const results = new Array(items.length);
   let cursor = 0;
@@ -26,16 +33,38 @@ function describeError(err) {
   return { code: 'UNKNOWN', message: 'Unexpected error while reading Planner' };
 }
 
-async function buildDashboard({ people, completedDays = 14, now = Date.now(), log = () => {} }) {
-  const fetched = await mapLimit(people, 3, async (person) => {
-    try {
-      const raw = await listUserTasks(person.userId || person.email);
-      return { person, selected: selectTasks(raw, completedDays, now) };
-    } catch (err) {
-      log(`Planner lookup failed for ${person.email}: ${err.message}`);
-      return { person, error: describeError(err) };
-    }
-  });
+function pruneCache(ttlMs) {
+  if (personCache.size <= MAX_CACHE_ENTRIES) return;
+  for (const [key, entry] of personCache) {
+    if (Date.now() - entry.at >= ttlMs) personCache.delete(key);
+  }
+}
+
+/** One person's selected tasks, shared between concurrent requests for ttlMs. */
+function loadPerson(person, { completedDays, now, ttlMs, log }) {
+  const cacheKey = person.key.toLowerCase();
+  const hit = personCache.get(cacheKey);
+  if (hit && Date.now() - hit.at < ttlMs) return hit.promise;
+
+  const promise = listUserTasks(person.key)
+    .then((raw) => ({ selected: selectTasks(raw, completedDays, now) }))
+    .catch((err) => {
+      log(`Planner lookup failed for ${person.email || person.key}: ${err.message}`);
+      return { error: describeError(err) };
+    });
+  personCache.set(cacheKey, { at: Date.now(), promise });
+  pruneCache(ttlMs);
+  return promise;
+}
+
+/**
+ * people: [{ key, name, email? }] where key is an Entra object ID or an email.
+ */
+async function buildDashboard({ people, completedDays = 14, now = Date.now(), ttlMs = 0, log = () => {} }) {
+  const fetched = await mapLimit(people, 3, async (person) => ({
+    person,
+    ...(await loadPerson(person, { completedDays, now, ttlMs, log })),
+  }));
 
   const planIds = new Set();
   const bucketIds = new Set();
@@ -57,8 +86,9 @@ async function buildDashboard({ people, completedDays = 14, now = Date.now(), lo
     generatedAt: new Date(now).toISOString(),
     completedDays,
     people: fetched.map(({ person, selected, error }) => ({
-      name: person.name || person.email,
-      email: person.email,
+      key: person.key,
+      name: person.name || person.email || person.key,
+      email: person.email || null,
       error: error || null,
       tasks: (selected || []).map((task) =>
         shapeTask(task, {
@@ -70,4 +100,4 @@ async function buildDashboard({ people, completedDays = 14, now = Date.now(), lo
   };
 }
 
-module.exports = { buildDashboard, describeError, mapLimit };
+module.exports = { buildDashboard, describeError, mapLimit, clearPersonCache };
