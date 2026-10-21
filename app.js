@@ -12,9 +12,41 @@
   const refreshBtn = document.getElementById('refresh');
   const showDoneEl = document.getElementById('show-done');
 
+  const STORAGE_KEY = 'staffTasks.selection.v1';
+  const MAX_PEOPLE = 8;
+
   let data = null;
   let loadedAt = 0;
   let loading = false;
+
+  /* ---------- Saved selection (this browser only) ---------- */
+
+  // null means "show the default list"; an array (possibly empty) is the viewer's own choice.
+  function readSelection() {
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      const list = JSON.parse(raw);
+      if (!Array.isArray(list)) return null;
+      return list
+        .filter((p) => p && typeof p.key === 'string' && typeof p.name === 'string')
+        .slice(0, MAX_PEOPLE)
+        .map((p) => ({ key: p.key, name: p.name, email: typeof p.email === 'string' ? p.email : null }));
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function writeSelection(list) {
+    try {
+      if (list) window.localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+      else window.localStorage.removeItem(STORAGE_KEY);
+    } catch (err) {
+      /* Storage can be blocked; the choice then lasts until the page closes. */
+    }
+  }
+
+  let selection = readSelection();
 
   /* ---------- DOM helper (text only, never innerHTML) ---------- */
 
@@ -115,7 +147,7 @@
   /* ---------- Rendering ---------- */
 
   const PERSON_ERRORS = {
-    USER_NOT_FOUND: (p) => `Microsoft 365 doesn’t recognize ${p.email}. Check the email in api/staff.json.`,
+    USER_NOT_FOUND: (p) => `Microsoft 365 doesn’t recognize ${p.email || p.key}. If this is on the default list, check the email in api/staff.json.`,
     FORBIDDEN: () => 'The dashboard app isn’t allowed to read Planner tasks yet. A Microsoft 365 admin needs to grant consent.',
     CONFIG: (p) => `${p.error.message}. Add them in the Static Web App’s environment variables.`,
     AUTH: (p) => `Microsoft rejected the dashboard app’s sign-in (${p.error.message}). The client secret may have expired.`,
@@ -204,7 +236,11 @@
     if (!data) return;
     const today = dayInTz(new Date());
     const showDone = showDoneEl.checked;
-    peopleEl.replaceChildren(...data.people.map((person) => renderPerson(person, today, showDone)));
+    if (data.people.length === 0) {
+      peopleEl.replaceChildren(h('p', { class: 'empty' }, 'No one is selected. Use Choose people to add someone.'));
+    } else {
+      peopleEl.replaceChildren(...data.people.map((person) => renderPerson(person, today, showDone)));
+    }
     updatedEl.textContent = `Updated ${clockTime(loadedAt)}`;
   }
 
@@ -215,20 +251,33 @@
     messageEl.classList.toggle('is-error', Boolean(isError));
   }
 
-  async function load() {
-    if (loading) return;
+  // Returns true when the saved list was rejected and a retry with the default list is needed.
+  async function loadOnce() {
+    if (loading) return false;
     loading = true;
     refreshBtn.disabled = true;
     boardEl.setAttribute('aria-busy', 'true');
     if (!data) setMessage('Loading tasks…');
 
     try {
-      const response = await fetch('/api/tasks', {
-        headers: { Accept: 'application/json' },
-        cache: 'no-store',
-        credentials: 'same-origin',
-      });
-      if (response.status === 401) { window.location.assign('/login'); return; }
+      if (Array.isArray(selection) && selection.length === 0) {
+        data = { people: [] };
+        loadedAt = Date.now();
+        setMessage('');
+        render();
+        return false;
+      }
+
+      const request = Array.isArray(selection)
+        ? {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify({ people: selection.map(({ key, name }) => ({ key, name })) }),
+          }
+        : { headers: { Accept: 'application/json' } };
+      const response = await fetch('/api/tasks', { ...request, cache: 'no-store', credentials: 'same-origin' });
+
+      if (response.status === 401) { window.location.assign('/login'); return false; }
       if (response.status === 403) {
         const body = await response.json().catch(() => ({}));
         data = null;
@@ -240,9 +289,15 @@
             : 'This account isn’t on the viewer list. Ask the person who manages this dashboard to add it.',
           true
         );
-        return;
+        return false;
+      }
+      if (response.status === 400 && Array.isArray(selection)) {
+        selection = null;
+        writeSelection(null);
+        return true;
       }
       if (!response.ok) throw new Error(`Request failed (${response.status})`);
+
       data = await response.json();
       loadedAt = Date.now();
       setMessage('');
@@ -258,7 +313,164 @@
       refreshBtn.disabled = false;
       boardEl.removeAttribute('aria-busy');
     }
+    return false;
   }
+
+  async function load() {
+    if (await loadOnce()) await loadOnce();
+  }
+
+  /* ---------- People picker ---------- */
+
+  const pickerEl = document.getElementById('picker');
+  const chooseBtn = document.getElementById('choose');
+  const doneBtn = document.getElementById('picker-done');
+  const resetBtn = document.getElementById('picker-reset');
+  const queryEl = document.getElementById('picker-query');
+  const pickerStatusEl = document.getElementById('picker-status');
+  const resultsEl = document.getElementById('picker-results');
+  const chosenEl = document.getElementById('picker-chosen');
+
+  let working = [];
+  let results = [];
+  let dirty = false;
+  let searchTimer = 0;
+  let searchSeq = 0;
+
+  function setPickerStatus(text) {
+    pickerStatusEl.textContent = text || '';
+  }
+
+  function limitMessage() {
+    return `You can show up to ${MAX_PEOPLE} people. Remove someone to add another.`;
+  }
+
+  function isChosen(person) {
+    const email = (person.email || '').toLowerCase();
+    return working.some((p) => p.key.toLowerCase() === person.key.toLowerCase() || (email && (p.email || '').toLowerCase() === email));
+  }
+
+  function personRow(person, label, onClick, disabled) {
+    const button = h('button', {
+      type: 'button',
+      class: 'btn btn-small',
+      'aria-label': `${label} ${person.name}`,
+      disabled: disabled ? 'disabled' : null,
+    }, label);
+    button.addEventListener('click', onClick);
+    return h('li', { class: 'picker-row' },
+      h('div', null,
+        h('p', { class: 'picker-name' }, person.name),
+        person.title && h('p', { class: 'picker-sub' }, person.title),
+        person.email && h('p', { class: 'picker-sub' }, person.email)),
+      button);
+  }
+
+  function renderPicker() {
+    const full = working.length >= MAX_PEOPLE;
+
+    const visible = results.filter((person) => !isChosen(person));
+    resultsEl.replaceChildren(...visible.map((person) =>
+      personRow(person, 'Add', () => {
+        if (working.length >= MAX_PEOPLE) return;
+        working.push({ key: person.key, name: person.name, email: person.email || null });
+        dirty = true;
+        setPickerStatus(`${person.name} added.`);
+        renderPicker();
+      }, full)));
+
+    if (full) setPickerStatus(limitMessage());
+
+    if (working.length === 0) {
+      chosenEl.replaceChildren(h('li', { class: 'picker-empty' }, 'No one yet. Search above to add someone.'));
+    } else {
+      chosenEl.replaceChildren(...working.map((person, index) =>
+        personRow(person, 'Remove', () => {
+          working.splice(index, 1);
+          dirty = true;
+          setPickerStatus(`${person.name} removed.`);
+          renderPicker();
+        })));
+    }
+  }
+
+  function openPicker() {
+    const source = Array.isArray(selection) ? selection : (data ? data.people : []);
+    working = source.map((p) => ({ key: p.key, name: p.name, email: p.email || null }));
+    results = [];
+    dirty = false;
+    queryEl.value = '';
+    setPickerStatus('');
+    renderPicker();
+    pickerEl.showModal();
+    queryEl.focus();
+  }
+
+  async function runSearch(term) {
+    const seq = (searchSeq += 1);
+    setPickerStatus('Searching…');
+    try {
+      const response = await fetch(`/api/people?q=${encodeURIComponent(term)}`, {
+        headers: { Accept: 'application/json' },
+        cache: 'no-store',
+        credentials: 'same-origin',
+      });
+      if (seq !== searchSeq) return;
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        results = [];
+        renderPicker();
+        setPickerStatus(
+          body.error === 'GRAPH_FORBIDDEN'
+            ? 'The dashboard app needs permission to search people. A Microsoft 365 admin must grant User.Read.All.'
+            : 'Search isn’t working right now. Try again in a minute.'
+        );
+        return;
+      }
+      const body = await response.json();
+      results = Array.isArray(body.results) ? body.results : [];
+      renderPicker();
+      setPickerStatus(working.length >= MAX_PEOPLE ? limitMessage() : (results.length ? '' : 'No one found.'));
+    } catch (err) {
+      if (seq !== searchSeq) return;
+      results = [];
+      renderPicker();
+      setPickerStatus('Search isn’t working right now. Try again in a minute.');
+    }
+  }
+
+  chooseBtn.addEventListener('click', openPicker);
+  doneBtn.addEventListener('click', () => pickerEl.close());
+
+  queryEl.addEventListener('input', () => {
+    window.clearTimeout(searchTimer);
+    searchSeq += 1;
+    const term = queryEl.value.trim();
+    if (term.length < 2) {
+      results = [];
+      setPickerStatus('');
+      renderPicker();
+      return;
+    }
+    searchTimer = window.setTimeout(() => runSearch(term), 250);
+  });
+
+  resetBtn.addEventListener('click', () => {
+    selection = null;
+    writeSelection(null);
+    dirty = false;
+    pickerEl.close();
+    load();
+  });
+
+  pickerEl.addEventListener('close', () => {
+    window.clearTimeout(searchTimer);
+    if (!dirty) return;
+    dirty = false;
+    selection = working.map((p) => ({ key: p.key, name: p.name, email: p.email }));
+    writeSelection(selection);
+    load();
+  });
 
   refreshBtn.addEventListener('click', load);
   showDoneEl.addEventListener('change', render);
