@@ -34,28 +34,39 @@ function requireViewer(request) {
 }
 
 /**
+ * The Teams sign-in token travels in its own header, X-Teams-Token, because the
+ * platform in front of the API can replace the standard Authorization header
+ * with a value of its own. Authorization is still accepted as a fallback.
+ */
+function teamsTokenFrom(request) {
+  const custom = (request.headers.get('x-teams-token') || '').trim();
+  if (/^\S+$/.test(custom)) return custom;
+  const match = /^Bearer\s+(\S+)$/i.exec(request.headers.get('authorization') || '');
+  return match ? match[1] : null;
+}
+
+/**
  * Gate for the Teams endpoints (/api/teams/*). Those routes are open to
  * anonymous callers at the platform level, so this function is the only thing
  * standing between the internet and the data. It trusts nothing but a valid
- * Teams token in the Authorization header. It never reads x-ms-client-principal.
+ * Teams token. It never reads x-ms-client-principal.
  */
 async function requireTeamsViewer(request, { verify = verifyTeamsToken } = {}) {
-  const match = /^Bearer\s+(\S+)$/i.exec(request.headers.get('authorization') || '');
-  if (!match) return { ok: false, response: { status: 401, jsonBody: { error: 'SIGN_IN_REQUIRED', detail: 'NO_TOKEN' } } };
+  const token = teamsTokenFrom(request);
+  if (!token) return { ok: false, response: { status: 401, jsonBody: { error: 'SIGN_IN_REQUIRED', detail: 'NO_TOKEN' } } };
 
   let principal;
   try {
-    principal = await verify(match[1], {
+    principal = await verify(token, {
       tenantId: process.env.GRAPH_TENANT_ID,
       clientId: process.env.TEAMS_CLIENT_ID || process.env.AAD_CLIENT_ID,
     });
   } catch (err) {
     const code = (err && err.code) || 'INVALID';
     const unavailable = code === 'CONFIG' || code === 'KEYS_UNAVAILABLE';
-    return {
-      ok: false,
-      response: { status: unavailable ? 503 : 401, jsonBody: { error: unavailable ? 'UNAVAILABLE' : 'SIGN_IN_REQUIRED', detail: code } },
-    };
+    const body = { error: unavailable ? 'UNAVAILABLE' : 'SIGN_IN_REQUIRED', detail: code };
+    if (err && err.info) body.info = err.info;
+    return { ok: false, response: { status: unavailable ? 503 : 401, jsonBody: body } };
   }
 
   if (!isViewer(principal, process.env.VIEWER_EMAILS)) {
