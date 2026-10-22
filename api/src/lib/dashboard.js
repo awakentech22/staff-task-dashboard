@@ -2,6 +2,7 @@
 
 const { listUserTasks, getPlanInfo, getBucketTitle } = require('./graph');
 const { shapeTask, selectTasks } = require('./shape');
+const { buildLinks } = require('./links');
 
 const MAX_CACHE_ENTRIES = 200;
 const personCache = new Map(); // lowercased key -> { at, promise }
@@ -110,6 +111,7 @@ async function buildDashboard({ people, completedDays = 14, now = Date.now(), tt
           return shapeTask(task, {
             planTitle: info && info.title,
             bucketTitle: bucketTitles.get(task.bucketId),
+            ...buildLinks(task),
           });
         }),
       };
