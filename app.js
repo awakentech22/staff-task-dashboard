@@ -363,7 +363,7 @@
 
       if (response.status === 401) {
         if (host.unauthorizedMessage) {
-          setMessage(host.unauthorizedMessage, true);
+          setMessage(`${host.unauthorizedMessage} (${await describeFailure(response)})`, true);
         } else {
           window.location.assign('/login');
         }
