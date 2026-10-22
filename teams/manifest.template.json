@@ -1,0 +1,44 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.17/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.17",
+  "version": "{{VERSION}}",
+  "id": "6bd73320-f101-4458-9890-d295b99e7c40",
+  "developer": {
+    "name": "Awaken Las Vegas",
+    "websiteUrl": "https://awakenlv.org",
+    "privacyUrl": "https://awakenlv.org",
+    "termsOfUseUrl": "https://awakenlv.org"
+  },
+  "name": {
+    "short": "Planner Tasks",
+    "full": "Planner Tasks Dashboard"
+  },
+  "description": {
+    "short": "See Microsoft Planner tasks for the people you lead.",
+    "full": "A live dashboard of Microsoft Planner tasks for the people you choose. Search your organization, pick up to eight people, and see overdue, upcoming and undated tasks at a glance. Open any task or plan in Planner with one click. By default it shows only the plans you created."
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "accentColor": "#292929",
+  "staticTabs": [
+    {
+      "entityId": "plannerTasks",
+      "name": "Planner Tasks",
+      "contentUrl": "https://{{HOST}}/teams.html",
+      "websiteUrl": "https://{{HOST}}/",
+      "scopes": [
+        "personal"
+      ]
+    }
+  ],
+  "validDomains": [
+    "{{HOST}}",
+    "planner.cloud.microsoft"
+  ],
+  "webApplicationInfo": {
+    "id": "{{CLIENT_ID}}",
+    "resource": "api://{{HOST}}/{{CLIENT_ID}}"
+  }
+}
