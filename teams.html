@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Planner tasks | Awaken LV (Teams)</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/vendor/MicrosoftTeams.min.js" defer></script>
+  <script src="/teams.js" defer></script>
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="top">
+    <div class="top-inner">
+      <div class="heading">
+        <h1>Planner tasks</h1>
+      </div>
+      <div class="actions">
+        <label class="toggle">
+          <input type="checkbox" id="only-mine">
+          <span>Only plans I created</span>
+        </label>
+        <label class="toggle">
+          <input type="checkbox" id="show-done">
+          <span>Show recently completed</span>
+        </label>
+        <button type="button" class="btn" id="choose">Choose people</button>
+        <button type="button" class="btn" id="refresh">Refresh</button>
+        <span id="updated" class="updated" role="status" aria-live="polite"></span>
+      </div>
+    </div>
+  </header>
+
+  <main id="board" aria-busy="true">
+    <p id="message" class="message" role="status">Loading tasks…</p>
+    <div id="people" class="people"></div>
+  </main>
+
+  <dialog id="picker" aria-labelledby="picker-title">
+    <div class="picker-inner">
+      <div class="picker-top">
+        <h2 id="picker-title">Choose people</h2>
+        <button type="button" class="btn btn-solid btn-small" id="picker-done">Done</button>
+      </div>
+
+      <label class="picker-label" for="picker-query">Find someone in your organization</label>
+      <input id="picker-query" class="picker-input" type="search" autocomplete="off" spellcheck="false" placeholder="Type a name or email">
+      <p id="picker-status" class="picker-status" role="status" aria-live="polite"></p>
+      <ul id="picker-results" class="picker-list" aria-label="Search results"></ul>
+
+      <h3 class="picker-heading">Showing now</h3>
+      <ul id="picker-chosen" class="picker-list" aria-label="People shown on the dashboard"></ul>
+
+      <div class="picker-foot">
+        <button type="button" class="btn btn-quiet btn-small" id="picker-reset">Reset to the default list</button>
+      </div>
+    </div>
+  </dialog>
+</body>
+</html>
