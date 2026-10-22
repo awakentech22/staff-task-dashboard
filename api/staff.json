@@ -1,5 +1,5 @@
 {
-  "_comment": "People shown on the dashboard. 'email' must be the person's Microsoft 365 sign-in name (UPN). Add an optional 'userId' (Entra object ID) if the email does not resolve.",
+  "_comment": "The default list, shown until a viewer chooses their own people with Choose people. 'email' must be the person's Microsoft 365 sign-in name (UPN). Add an optional 'userId' (Entra object ID) if the email does not resolve.",
   "people": [
     { "name": "Daniel Barletta", "email": "danielbarletta@awakenlv.org" },
     { "name": "Kenny Ohiaeri", "email": "kennyohiaeri@awakenlv.org" },
