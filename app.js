@@ -328,6 +328,7 @@
       const body = await response.json();
       if (body && body.error) parts.push(String(body.error));
       if (body && body.detail) parts.push(String(body.detail));
+      if (body && body.info) parts.push(String(body.info));
     } catch (err) {
       /* Not JSON, for example an HTML error page. */
     }
