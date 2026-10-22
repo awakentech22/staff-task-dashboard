@@ -29,6 +29,8 @@ function shapeTask(raw, lookups = {}) {
     planId: raw.planId || null,
     planTitle: lookups.planTitle || null,
     bucketTitle: lookups.bucketTitle || null,
+    taskUrl: lookups.taskUrl || null,
+    planUrl: lookups.planUrl || null,
     dueDateTime: raw.dueDateTime || null,
     startDateTime: raw.startDateTime || null,
     completedDateTime: raw.completedDateTime || null,
