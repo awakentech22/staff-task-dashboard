@@ -12,12 +12,77 @@
     }
   },
   "routes": [
-    { "route": "/403.html", "allowedRoles": ["anonymous"] },
-    { "route": "/403.css", "allowedRoles": ["anonymous"] },
-    { "route": "/login", "rewrite": "/.auth/login/aad" },
-    { "route": "/logout", "redirect": "/.auth/logout" },
-    { "route": "/api/*", "allowedRoles": ["authenticated"] },
-    { "route": "/*", "allowedRoles": ["authenticated"] }
+    {
+      "route": "/403.html",
+      "allowedRoles": [
+        "anonymous"
+      ]
+    },
+    {
+      "route": "/403.css",
+      "allowedRoles": [
+        "anonymous"
+      ]
+    },
+    {
+      "route": "/teams.html",
+      "allowedRoles": [
+        "anonymous"
+      ],
+      "headers": {
+        "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'self' https://teams.microsoft.com https://*.teams.microsoft.com https://*.skype.com https://*.cloud.microsoft https://*.microsoft365.com https://*.office.com"
+      }
+    },
+    {
+      "route": "/teams.js",
+      "allowedRoles": [
+        "anonymous"
+      ]
+    },
+    {
+      "route": "/app.js",
+      "allowedRoles": [
+        "anonymous"
+      ]
+    },
+    {
+      "route": "/styles.css",
+      "allowedRoles": [
+        "anonymous"
+      ]
+    },
+    {
+      "route": "/vendor/*",
+      "allowedRoles": [
+        "anonymous"
+      ]
+    },
+    {
+      "route": "/api/teams/*",
+      "allowedRoles": [
+        "anonymous"
+      ]
+    },
+    {
+      "route": "/login",
+      "rewrite": "/.auth/login/aad"
+    },
+    {
+      "route": "/logout",
+      "redirect": "/.auth/logout"
+    },
+    {
+      "route": "/api/*",
+      "allowedRoles": [
+        "authenticated"
+      ]
+    },
+    {
+      "route": "/*",
+      "allowedRoles": [
+        "authenticated"
+      ]
+    }
   ],
   "responseOverrides": {
     "401": {
