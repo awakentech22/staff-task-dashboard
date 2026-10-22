@@ -11,6 +11,7 @@
   const updatedEl = document.getElementById('updated');
   const refreshBtn = document.getElementById('refresh');
   const showDoneEl = document.getElementById('show-done');
+  const onlyMineEl = document.getElementById('only-mine');
 
   const STORAGE_KEY = 'staffTasks.selection.v1';
   const MAX_PEOPLE = 8;
@@ -47,6 +48,20 @@
   }
 
   let selection = readSelection();
+
+  /* "Only plans I created" is on unless the viewer turned it off. */
+  const ONLY_MINE_KEY = 'staffTasks.onlyMine.v1';
+  function readOnlyMine() {
+    try { return window.localStorage.getItem(ONLY_MINE_KEY) !== 'off'; } catch (err) { return true; }
+  }
+  function writeOnlyMine(on) {
+    try {
+      if (on) window.localStorage.removeItem(ONLY_MINE_KEY);
+      else window.localStorage.setItem(ONLY_MINE_KEY, 'off');
+    } catch (err) { /* Storage can be blocked. */ }
+  }
+  let onlyMine = readOnlyMine();
+  onlyMineEl.checked = onlyMine;
 
   /* ---------- DOM helper (text only, never innerHTML) ---------- */
 
@@ -194,6 +209,13 @@
       h('h2', null, person.name),
       h('p', { class: 'count' }, person.error ? 'Couldn’t load' : `${open.length} open`));
 
+    const filterApplied = Boolean(data && data.filter && data.filter.applied);
+    const hidden = person.hiddenCount || 0;
+    if (!person.error && filterApplied && hidden > 0) {
+      head.append(h('p', { class: 'note' },
+        `${hidden} open ${hidden === 1 ? 'task is' : 'tasks are'} in plans created by someone else, so ${hidden === 1 ? 'it’s' : 'they’re'} hidden.`));
+    }
+
     if (!person.error && open.length > 0) {
       const counts = [
         ['overdue', buckets.overdue.length, 'overdue'],
@@ -218,7 +240,7 @@
       const describe = PERSON_ERRORS[person.error.code] || PERSON_ERRORS.UNKNOWN;
       body.push(h('div', { class: 'notice', role: 'alert' }, h('strong', null, 'Tasks unavailable'), describe(person)));
     } else if (open.length === 0 && !(showDone && done.length)) {
-      body.push(h('p', { class: 'empty' }, 'Nothing open right now.'));
+      body.push(h('p', { class: 'empty' }, filterApplied && hidden > 0 ? 'Nothing open in plans you created.' : 'Nothing open right now.'));
     } else {
       for (const { key, label } of GROUPS) {
         const list = buckets[key];
@@ -268,13 +290,14 @@
         return false;
       }
 
-      const request = Array.isArray(selection)
-        ? {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-            body: JSON.stringify({ people: selection.map(({ key, name }) => ({ key, name })) }),
-          }
-        : { headers: { Accept: 'application/json' } };
+      const request = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          people: Array.isArray(selection) ? selection.map(({ key, name }) => ({ key, name })) : null,
+          onlyMine,
+        }),
+      };
       const response = await fetch('/api/tasks', { ...request, cache: 'no-store', credentials: 'same-origin' });
 
       if (response.status === 401) { window.location.assign('/login'); return false; }
@@ -300,7 +323,11 @@
 
       data = await response.json();
       loadedAt = Date.now();
-      setMessage('');
+      if (data.filter && data.filter.error) {
+        setMessage('We couldn’t work out which plans you created, so every plan is shown. Try Refresh in a minute.', true);
+      } else {
+        setMessage('');
+      }
       render();
     } catch (err) {
       if (data) {
@@ -474,6 +501,11 @@
 
   refreshBtn.addEventListener('click', load);
   showDoneEl.addEventListener('change', render);
+  onlyMineEl.addEventListener('change', () => {
+    onlyMine = onlyMineEl.checked;
+    writeOnlyMine(onlyMine);
+    load();
+  });
 
   setInterval(() => {
     if (document.visibilityState === 'visible') load();
