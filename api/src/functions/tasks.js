@@ -5,7 +5,8 @@ const path = require('path');
 const { app } = require('@azure/functions');
 const { buildDashboard } = require('../lib/dashboard');
 const { requireViewer } = require('../lib/auth');
-const { parsePeople } = require('../lib/request');
+const { parseRequest } = require('../lib/request');
+const { resolveViewerId } = require('../lib/viewer');
 
 const STAFF_FILE = path.join(__dirname, '..', '..', 'staff.json');
 const CACHE_SECONDS = Number(process.env.CACHE_SECONDS) > 0 ? Number(process.env.CACHE_SECONDS) : 60;
@@ -25,7 +26,10 @@ function loadDefaultPeople() {
 
 /**
  * GET  /api/tasks  -> tasks for the default staff list (api/staff.json)
- * POST /api/tasks  -> tasks for { people: [{ key, name }] } (max 8)
+ * POST /api/tasks  -> tasks for { people: [{ key, name }], onlyMine } (max 8 people)
+ *
+ * onlyMine (default true) limits results to tasks in plans the signed-in
+ * viewer created. It is a view preference, not an access control.
  */
 app.http('tasks', {
   methods: ['GET', 'POST'],
@@ -36,20 +40,37 @@ app.http('tasks', {
     if (!auth.ok) return auth.response;
 
     let people = null;
+    let onlyMine = true;
     if (request.method === 'POST') {
       const body = await request.json().catch(() => null);
-      const parsed = parsePeople(body);
+      const parsed = parseRequest(body);
       if (parsed.error) return { status: 400, jsonBody: { error: parsed.error } };
       people = parsed.people;
+      onlyMine = parsed.onlyMine;
     }
 
     try {
+      let viewerId = null;
+      if (onlyMine) {
+        try {
+          viewerId = await resolveViewerId(auth.principal);
+        } catch (err) {
+          context.log(`Could not resolve the viewer: ${err.message}`);
+        }
+      }
+
       const payload = await buildDashboard({
         people: people || loadDefaultPeople(),
         completedDays: COMPLETED_DAYS,
         ttlMs: CACHE_SECONDS * 1000,
         log: (message) => context.log(message),
+        onlyCreatedBy: viewerId,
       });
+      payload.filter = {
+        onlyMine,
+        applied: Boolean(onlyMine && viewerId),
+        error: onlyMine && !viewerId ? 'VIEWER_UNKNOWN' : null,
+      };
       return { status: 200, headers: { 'Cache-Control': 'no-store' }, jsonBody: payload };
     } catch (err) {
       context.error(err);
