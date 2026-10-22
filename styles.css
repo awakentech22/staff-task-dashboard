@@ -12,7 +12,21 @@
   --line: rgba(41, 41, 41, 0.14);
   --font: "Suiza", "Helvetica Neue", Helvetica, Arial, sans-serif;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --header-bg: var(--ink);
+  --header-fg: #ffffff;
   color-scheme: light;
+}
+
+/* Set by teams.js to follow the Teams dark and high-contrast themes. */
+:root[data-theme="dark"] {
+  --ink: #f2f2f2;
+  --paper: #1f1f1f;
+  --muted: #b9b9b9;
+  --line: rgba(255, 255, 255, 0.22);
+  --ember-text: #f4936f;
+  --header-bg: #2b2b2b;
+  --header-fg: #ffffff;
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -31,8 +45,8 @@ body {
 
 /* Header */
 .top {
-  background: var(--ink);
-  color: #ffffff;
+  background: var(--header-bg);
+  color: var(--header-fg);
   padding: 1.25rem clamp(1rem, 4vw, 3rem);
 }
 .top-inner {
@@ -67,20 +81,20 @@ body {
   appearance: none;
   font: inherit;
   font-weight: 600;
-  color: #ffffff;
+  color: var(--header-fg);
   background: transparent;
-  border: 1px solid #ffffff;
+  border: 1px solid var(--header-fg);
   border-radius: 999px;
   padding: 0.45rem 1.1rem;
   cursor: pointer;
   transition: background-color 240ms var(--ease), color 240ms var(--ease);
 }
-.btn:hover { background: #ffffff; color: var(--ink); }
+.btn:hover { background: var(--header-fg); color: var(--header-bg); }
 .btn[disabled] { opacity: 0.4; cursor: not-allowed; }
-.btn[disabled]:hover { background: transparent; color: #ffffff; }
+.btn[disabled]:hover { background: transparent; color: var(--header-fg); }
 
 .updated { color: var(--bone); min-inline-size: 8.5rem; }
-.signout { color: #ffffff; text-underline-offset: 0.2em; }
+.signout { color: var(--header-fg); text-underline-offset: 0.2em; }
 .signout:hover { text-decoration-thickness: 2px; }
 
 /* Board */
@@ -229,21 +243,43 @@ main {
   margin-block-start: 1.25rem;
   padding: 1rem 1.1rem;
   background: var(--bone);
-  color: var(--ink);
+  color: #292929;
   font-size: 0.9375rem;
 }
 .notice strong { display: block; margin-block-end: 0.2rem; }
 
+/* First-run state: nobody chosen yet */
+.start { max-inline-size: 38rem; padding-block: 3.5rem; }
+.start h2 {
+  margin: 0 0 0.75rem;
+  font-size: clamp(1.5rem, 1.1rem + 1.6vw, 2.25rem);
+  line-height: 0.95;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+}
+.start p { margin: 0 0 1.5rem; color: var(--muted); }
+.btn-page {
+  appearance: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--paper);
+  background: var(--ink);
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  padding: 0.65rem 1.5rem;
+  cursor: pointer;
+  transition: background-color 240ms var(--ease), color 240ms var(--ease);
+}
+.btn-page:hover { background: var(--paper); color: var(--ink); }
+
 /* People picker */
-.btn-solid { background: var(--ink); color: #ffffff; border-color: var(--ink); }
-.btn-solid:hover { background: #ffffff; color: var(--ink); }
-.btn-quiet { color: var(--ink); border-color: var(--ink); }
-.btn-quiet:hover { background: var(--ink); color: #ffffff; }
-.btn-small { padding: 0.3rem 0.9rem; font-size: 0.875rem; }
+/* Buttons that sit on the page surface (inside the picker) use the page tokens. */
 .picker-inner .btn { color: var(--ink); border-color: var(--ink); }
-.picker-inner .btn:hover { background: var(--ink); color: #ffffff; }
-.picker-inner .btn-solid { color: #ffffff; }
-.picker-inner .btn-solid:hover { background: #ffffff; color: var(--ink); }
+.picker-inner .btn:hover { background: var(--ink); color: var(--paper); }
+.picker-inner .btn-solid { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.picker-inner .btn-solid:hover { background: var(--paper); color: var(--ink); }
+.btn-small { padding: 0.3rem 0.9rem; font-size: 0.875rem; }
 .picker-inner .btn[disabled]:hover { background: transparent; color: var(--ink); }
 
 #picker {
