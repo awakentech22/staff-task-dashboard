@@ -17,9 +17,10 @@ const KEYS_MIN_REFRESH_MS = 5 * 60 * 1000;
 const REQUIRED_SCOPE = 'access_as_user';
 
 class TokenError extends Error {
-  constructor(code) {
+  constructor(code, info) {
     super(code);
     this.code = code;
+    this.info = info || null;
   }
 }
 
@@ -84,7 +85,7 @@ async function verifyTeamsToken(token, { tenantId, clientId, now = Date.now(), g
   const header = parseSegment(parts[0]);
   const claims = parseSegment(parts[1]);
 
-  if (header.alg !== 'RS256') throw new TokenError('BAD_ALGORITHM');
+  if (header.alg !== 'RS256') throw new TokenError('BAD_ALGORITHM', `alg ${String(header.alg).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 20)}`);
   const jwk = await findKey(header.kid, tenantId, getKeys);
   if (!jwk) throw new TokenError('UNKNOWN_KEY');
 
