@@ -33,25 +33,25 @@
 
   /* ---------- Saved selection (this browser only) ---------- */
 
-  // null means "show the default list"; an array (possibly empty) is the viewer's own choice.
+  // The viewer's own list. Empty means nobody is chosen yet.
   function readSelection() {
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (!raw) return null;
+      if (!raw) return [];
       const list = JSON.parse(raw);
-      if (!Array.isArray(list)) return null;
+      if (!Array.isArray(list)) return [];
       return list
         .filter((p) => p && typeof p.key === 'string' && typeof p.name === 'string')
         .slice(0, MAX_PEOPLE)
         .map((p) => ({ key: p.key, name: p.name, email: typeof p.email === 'string' ? p.email : null }));
     } catch (err) {
-      return null;
+      return [];
     }
   }
 
   function writeSelection(list) {
     try {
-      if (list) window.localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+      if (list && list.length) window.localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
       else window.localStorage.removeItem(STORAGE_KEY);
     } catch (err) {
       /* Storage can be blocked; the choice then lasts until the page closes. */
@@ -209,7 +209,7 @@
   }
 
   const PERSON_ERRORS = {
-    USER_NOT_FOUND: (p) => `Microsoft 365 doesn’t recognize ${p.email || p.key}. If this is on the default list, check the email in api/staff.json.`,
+    USER_NOT_FOUND: (p) => `Microsoft 365 doesn’t recognize ${p.email || p.key}. Remove this person and search for them again.`,
     FORBIDDEN: () => 'The dashboard app isn’t allowed to read Planner tasks yet. A Microsoft 365 admin needs to grant consent.',
     CONFIG: (p) => `${p.error.message}. Add them in the Static Web App’s environment variables.`,
     AUTH: (p) => `Microsoft rejected the dashboard app’s sign-in (${p.error.message}). The client secret may have expired.`,
@@ -307,7 +307,12 @@
     const today = dayInTz(new Date());
     const showDone = showDoneEl.checked;
     if (data.people.length === 0) {
-      peopleEl.replaceChildren(h('p', { class: 'empty' }, 'No one is selected. Use Choose people to add someone.'));
+      const choose = h('button', { type: 'button', class: 'btn-page' }, 'Choose people');
+      choose.addEventListener('click', openPicker);
+      peopleEl.replaceChildren(h('section', { class: 'start' },
+        h('h2', null, 'Choose whose tasks to follow'),
+        h('p', null, `Search your organization and pick up to ${MAX_PEOPLE} people. Their Planner tasks appear here, and your choices are remembered on this device.`),
+        choose));
     } else {
       peopleEl.replaceChildren(...data.people.map((person) => renderPerson(person, today, showDone)));
     }
@@ -335,7 +340,7 @@
     return parts.join(', ');
   }
 
-  // Returns true when the saved list was rejected and a retry with the default list is needed.
+  // Returns true when the saved list was rejected (kept for the caller's retry logic).
   async function loadOnce() {
     if (loading) return false;
     loading = true;
@@ -344,7 +349,7 @@
     if (!data) setMessage('Loading tasks…');
 
     try {
-      if (Array.isArray(selection) && selection.length === 0) {
+      if (selection.length === 0) {
         data = { people: [] };
         loadedAt = Date.now();
         setMessage('');
@@ -356,7 +361,7 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({
-          people: Array.isArray(selection) ? selection.map(({ key, name }) => ({ key, name })) : null,
+          people: selection.map(({ key, name }) => ({ key, name })),
           onlyMine,
         }),
       };
@@ -383,10 +388,15 @@
         );
         return false;
       }
-      if (response.status === 400 && Array.isArray(selection)) {
-        selection = null;
+      if (response.status === 400) {
+        // The saved list was not accepted, so start over rather than keep failing.
+        selection = [];
         writeSelection(null);
-        return true;
+        data = { people: [] };
+        loadedAt = Date.now();
+        setMessage('Your saved list couldn’t be used, so it was cleared. Choose people again.', true);
+        render();
+        return false;
       }
       if (!response.ok) {
         const why = await describeFailure(response);
@@ -426,7 +436,7 @@
   const pickerEl = document.getElementById('picker');
   const chooseBtn = document.getElementById('choose');
   const doneBtn = document.getElementById('picker-done');
-  const resetBtn = document.getElementById('picker-reset');
+  const clearBtn = document.getElementById('picker-clear');
   const queryEl = document.getElementById('picker-query');
   const pickerStatusEl = document.getElementById('picker-status');
   const resultsEl = document.getElementById('picker-results');
@@ -496,8 +506,7 @@
   }
 
   function openPicker() {
-    const source = Array.isArray(selection) ? selection : (data ? data.people : []);
-    working = source.map((p) => ({ key: p.key, name: p.name, email: p.email || null }));
+    working = selection.map((p) => ({ key: p.key, name: p.name, email: p.email || null }));
     results = [];
     dirty = false;
     queryEl.value = '';
@@ -557,12 +566,11 @@
     searchTimer = window.setTimeout(() => runSearch(term), 250);
   });
 
-  resetBtn.addEventListener('click', () => {
-    selection = null;
-    writeSelection(null);
-    dirty = false;
-    pickerEl.close();
-    load();
+  clearBtn.addEventListener('click', () => {
+    working = [];
+    dirty = true;
+    renderPicker();
+    setPickerStatus('Everyone removed. Press Done to apply.');
   });
 
   pickerEl.addEventListener('close', () => {
