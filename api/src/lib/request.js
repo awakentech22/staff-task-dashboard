@@ -10,7 +10,7 @@ const MAX_NAME = 100;
  * A key is an Entra object ID or an email. Names are display-only labels that
  * the browser sends back; they are never used to look anything up.
  *
- * Returns { people: null } when no list was sent (use the default staff list),
+ * Returns { people: null } when no list was sent (nobody is selected),
  * { people: [...] } when valid, or { error } when not.
  */
 function parsePeople(body) {
