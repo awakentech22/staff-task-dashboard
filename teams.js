@@ -35,7 +35,9 @@
       return token;
     } catch (err) {
       token = null;
-      throw userError(SIGN_IN_MESSAGE);
+      // Teams reports why it could not issue a token (for example resourceDisabled or a consent problem).
+      const reason = err && (err.message || err.errorCode || err.code);
+      throw userError(`${SIGN_IN_MESSAGE} (Teams could not issue a token${reason ? `: ${reason}` : ''})`);
     }
   }
 
