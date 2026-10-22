@@ -1,6 +1,7 @@
 'use strict';
 
 const { isViewer } = require('./roles');
+const { verifyTeamsToken } = require('./teamsToken');
 
 /** Static Web Apps forwards the signed-in user in this header. */
 function callerPrincipal(request) {
@@ -32,4 +33,38 @@ function requireViewer(request) {
   return { ok: true, principal };
 }
 
-module.exports = { callerPrincipal, requireViewer };
+/**
+ * Gate for the Teams endpoints (/api/teams/*). Those routes are open to
+ * anonymous callers at the platform level, so this function is the only thing
+ * standing between the internet and the data. It trusts nothing but a valid
+ * Teams token in the Authorization header. It never reads x-ms-client-principal.
+ */
+async function requireTeamsViewer(request, { verify = verifyTeamsToken } = {}) {
+  const match = /^Bearer\s+(\S+)$/i.exec(request.headers.get('authorization') || '');
+  if (!match) return { ok: false, response: { status: 401, jsonBody: { error: 'SIGN_IN_REQUIRED', detail: 'NO_TOKEN' } } };
+
+  let principal;
+  try {
+    principal = await verify(match[1], {
+      tenantId: process.env.GRAPH_TENANT_ID,
+      clientId: process.env.TEAMS_CLIENT_ID || process.env.AAD_CLIENT_ID,
+    });
+  } catch (err) {
+    const code = (err && err.code) || 'INVALID';
+    const unavailable = code === 'CONFIG' || code === 'KEYS_UNAVAILABLE';
+    return {
+      ok: false,
+      response: { status: unavailable ? 503 : 401, jsonBody: { error: unavailable ? 'UNAVAILABLE' : 'SIGN_IN_REQUIRED', detail: code } },
+    };
+  }
+
+  if (!isViewer(principal, process.env.VIEWER_EMAILS)) {
+    return {
+      ok: false,
+      response: { status: 403, jsonBody: { error: 'NOT_ON_VIEWER_LIST', signedInAs: principal.userDetails || null } },
+    };
+  }
+  return { ok: true, principal };
+}
+
+module.exports = { callerPrincipal, requireViewer, requireTeamsViewer };
