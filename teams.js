@@ -39,16 +39,28 @@
     }
   }
 
-  // Adds the Teams token to a request. On a 401 or a dropped request it asks Teams for a
-  // token again and tries once more before giving up.
+  const REDIRECT_MESSAGE =
+    'The API answered with a redirect to a sign-in page instead of data. That usually means the Teams sign-in token was rejected. Close and reopen the tab, and if it continues ask an admin to check the app’s sign-in setup.';
+
+  // Adds the Teams token to a request. On a 401, a redirect or a dropped request it asks Teams
+  // for a token again and tries once more before giving up. Redirects are not followed: a
+  // sign-in redirect cannot work inside Teams and would only hide the real problem.
   async function authFetch(url, init = {}, retried = false) {
     const bearer = await getToken(retried);
     let response;
     try {
-      response = await window.fetch(url, { ...init, headers: { ...(init.headers || {}), Authorization: `Bearer ${bearer}` } });
+      response = await window.fetch(url, {
+        ...init,
+        redirect: 'manual',
+        headers: { ...(init.headers || {}), Authorization: `Bearer ${bearer}` },
+      });
     } catch (err) {
       if (!retried) return authFetch(url, init, true);
       throw err;
+    }
+    if (response.type === 'opaqueredirect') {
+      if (!retried) return authFetch(url, init, true);
+      throw userError(REDIRECT_MESSAGE);
     }
     if (response.status === 401 && !retried) return authFetch(url, init, true);
     return response;
