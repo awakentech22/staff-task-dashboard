@@ -161,6 +161,23 @@
 
   /* ---------- Rendering ---------- */
 
+  // Only ever render https links, whatever the server sends.
+  function safeUrl(value) {
+    try {
+      const url = new URL(value);
+      return url.protocol === 'https:' ? url.href : null;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function plannerLink(url, className, ...kids) {
+    const href = safeUrl(url);
+    if (!href) return null;
+    return h('a', { class: className, href, target: '_blank', rel: 'noopener noreferrer' },
+      kids, h('span', { class: 'sr-only' }, ' (opens in Planner)'));
+  }
+
   function calendarIcon() {
     const ns = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(ns, 'svg');
@@ -194,9 +211,10 @@
 
     return h('li', { class: `task${overdue ? ' is-overdue' : ''}${isOpen ? '' : ' is-done'}` },
       h('div', { class: 'main' },
-        h('p', { class: 'title' }, task.title),
+        h('p', { class: 'title' }, plannerLink(task.taskUrl, 'title-link', task.title) || task.title),
         (task.planTitle || task.bucketTitle) && h('p', { class: 'where' },
-          task.planTitle && h('span', { class: 'plan' }, h('span', { class: 'label' }, 'Plan: '), task.planTitle),
+          task.planTitle && h('span', { class: 'plan' }, h('span', { class: 'label' }, 'Plan: '),
+            plannerLink(task.planUrl, 'plan-link', task.planTitle) || task.planTitle),
           task.bucketTitle && h('span', { class: 'bucket' }, h('span', { class: 'label' }, 'Bucket: '), task.bucketTitle))),
       h('div', { class: 'side' },
         day && h('span', { class: 'due' }, calendarIcon(), shortDate(day, today)),
