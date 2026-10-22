@@ -104,17 +104,16 @@ async function listUserTasks(userKey) {
   return tasks;
 }
 
-async function cachedName(kind, id, path, field) {
+async function cachedLookup(kind, id, path, pick) {
   const key = `${kind}:${id}`;
   const hit = nameCache.get(key);
   if (hit && Date.now() - hit.at < (hit.value ? NAME_TTL_MS : MISS_TTL_MS)) return hit.value;
 
   let value = null;
   try {
-    const data = await graphGet(path);
-    value = data[field] || null;
+    value = pick(await graphGet(path)) || null;
   } catch (err) {
-    // A missing plan or bucket name should never take the dashboard down.
+    // A missing name or lookup should never take the dashboard down.
     value = null;
   }
   nameCache.set(key, { value, at: Date.now() });
@@ -154,8 +153,19 @@ async function searchUsers(term) {
     }));
 }
 
-const getPlanTitle = (planId) => cachedName('plan', planId, `/planner/plans/${encodeURIComponent(planId)}`, 'title');
-const getBucketTitle = (bucketId) => cachedName('bucket', bucketId, `/planner/buckets/${encodeURIComponent(bucketId)}`, 'name');
+/** A plan's title and the Entra object ID of the person who created it (null if created by an app). */
+const getPlanInfo = (planId) =>
+  cachedLookup('plan', planId, `/planner/plans/${encodeURIComponent(planId)}`, (data) => ({
+    title: data.title || null,
+    createdById: (data.createdBy && data.createdBy.user && data.createdBy.user.id) || null,
+  }));
+
+const getBucketTitle = (bucketId) =>
+  cachedLookup('bucket', bucketId, `/planner/buckets/${encodeURIComponent(bucketId)}`, (data) => data.name);
+
+/** Entra object ID for an email or sign-in name. Needs User.Read.All. */
+const getUserId = (userKey) =>
+  cachedLookup('uid', String(userKey).toLowerCase(), `/users/${encodeURIComponent(userKey)}?$select=id`, (data) => data.id);
 
 function resetCaches() {
   tokenCache = { value: null, expiresAt: 0 };
@@ -163,4 +173,4 @@ function resetCaches() {
   nameCache.clear();
 }
 
-module.exports = { listUserTasks, getPlanTitle, getBucketTitle, searchUsers, buildUserSearch, resetCaches };
+module.exports = { listUserTasks, getPlanInfo, getBucketTitle, getUserId, searchUsers, buildUserSearch, resetCaches };
