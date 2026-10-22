@@ -1,6 +1,17 @@
 (() => {
   'use strict';
 
+  // In a browser the page talks to /api/* with the Static Web Apps cookie. In Teams, teams.js
+  // supplies a host that calls /api/teams/* with a Teams sign-in token instead.
+  const host = window.plannerHost || {
+    tasksUrl: '/api/tasks',
+    peopleUrl: '/api/people',
+    ready: Promise.resolve(),
+    fetch: (url, init) => window.fetch(url, init),
+    openLink: null,
+    unauthorizedMessage: null,
+  };
+
   const TZ = 'America/Los_Angeles';
   const AUTO_REFRESH_MS = 5 * 60 * 1000;
   const STALE_AFTER_MS = 2 * 60 * 1000;
@@ -174,8 +185,15 @@
   function plannerLink(url, className, ...kids) {
     const href = safeUrl(url);
     if (!href) return null;
-    return h('a', { class: className, href, target: '_blank', rel: 'noopener noreferrer' },
+    const link = h('a', { class: className, href, target: '_blank', rel: 'noopener noreferrer' },
       kids, h('span', { class: 'sr-only' }, ' (opens in Planner)'));
+    if (host.openLink) {
+      link.addEventListener('click', (event) => {
+        event.preventDefault();
+        host.openLink(href);
+      });
+    }
+    return link;
   }
 
   function calendarIcon() {
@@ -303,6 +321,19 @@
     messageEl.classList.toggle('is-error', Boolean(isError));
   }
 
+  // Short, safe description of a failed API response, for example "HTTP 503, UNAVAILABLE, CONFIG".
+  async function describeFailure(response) {
+    const parts = [`HTTP ${response.status}`];
+    try {
+      const body = await response.json();
+      if (body && body.error) parts.push(String(body.error));
+      if (body && body.detail) parts.push(String(body.detail));
+    } catch (err) {
+      /* Not JSON, for example an HTML error page. */
+    }
+    return parts.join(', ');
+  }
+
   // Returns true when the saved list was rejected and a retry with the default list is needed.
   async function loadOnce() {
     if (loading) return false;
@@ -328,9 +359,16 @@
           onlyMine,
         }),
       };
-      const response = await fetch('/api/tasks', { ...request, cache: 'no-store', credentials: 'same-origin' });
+      const response = await host.fetch(host.tasksUrl, { ...request, cache: 'no-store', credentials: 'same-origin' });
 
-      if (response.status === 401) { window.location.assign('/login'); return false; }
+      if (response.status === 401) {
+        if (host.unauthorizedMessage) {
+          setMessage(host.unauthorizedMessage, true);
+        } else {
+          window.location.assign('/login');
+        }
+        return false;
+      }
       if (response.status === 403) {
         const body = await response.json().catch(() => ({}));
         data = null;
@@ -349,7 +387,12 @@
         writeSelection(null);
         return true;
       }
-      if (!response.ok) throw new Error(`Request failed (${response.status})`);
+      if (!response.ok) {
+        const why = await describeFailure(response);
+        const failure = new Error(why);
+        failure.userMessage = `We couldn’t load the tasks (${why}). Press Refresh to try again.`;
+        throw failure;
+      }
 
       data = await response.json();
       loadedAt = Date.now();
@@ -363,7 +406,7 @@
       if (data) {
         setMessage(`Couldn’t refresh. Showing tasks from ${clockTime(loadedAt)}.`, true);
       } else {
-        setMessage('We couldn’t load the tasks. Check your connection and press Refresh.', true);
+        setMessage((err && err.userMessage) || `We couldn’t load the tasks (${(err && err.message) || 'request failed'}). Check your connection and press Refresh.`, true);
       }
     } finally {
       loading = false;
@@ -467,20 +510,21 @@
     const seq = (searchSeq += 1);
     setPickerStatus('Searching…');
     try {
-      const response = await fetch(`/api/people?q=${encodeURIComponent(term)}`, {
+      const response = await host.fetch(`${host.peopleUrl}?q=${encodeURIComponent(term)}`, {
         headers: { Accept: 'application/json' },
         cache: 'no-store',
         credentials: 'same-origin',
       });
       if (seq !== searchSeq) return;
       if (!response.ok) {
+        const why = await describeFailure(response.clone());
         const body = await response.json().catch(() => ({}));
         results = [];
         renderPicker();
         setPickerStatus(
           body.error === 'GRAPH_FORBIDDEN'
             ? 'The dashboard app needs permission to search people. A Microsoft 365 admin must grant User.Read.All.'
-            : 'Search isn’t working right now. Try again in a minute.'
+            : `Search isn’t working right now (${why}). Try again in a minute.`
         );
         return;
       }
@@ -492,7 +536,7 @@
       if (seq !== searchSeq) return;
       results = [];
       renderPicker();
-      setPickerStatus('Search isn’t working right now. Try again in a minute.');
+      setPickerStatus(`Search isn’t working right now (${(err && (err.userMessage || err.message)) || 'request failed'}). Try again in a minute.`);
     }
   }
 
@@ -545,5 +589,8 @@
     if (document.visibilityState === 'visible' && Date.now() - loadedAt > STALE_AFTER_MS) load();
   });
 
-  load();
+  host.ready.then(load, (err) => {
+    if (!(err && err.handled)) setMessage((err && err.userMessage) || 'This page could not start. Try again.', true);
+    boardEl.removeAttribute('aria-busy');
+  });
 })();
