@@ -161,6 +161,18 @@
 
   /* ---------- Rendering ---------- */
 
+  function calendarIcon() {
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    for (const [k, v] of Object.entries({ viewBox: '0 0 16 16', class: 'icon', 'aria-hidden': 'true', focusable: 'false' })) svg.setAttribute(k, v);
+    const rect = document.createElementNS(ns, 'rect');
+    for (const [k, v] of Object.entries({ x: '2', y: '3', width: '12', height: '11', rx: '1', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5' })) rect.setAttribute(k, v);
+    const lines = document.createElementNS(ns, 'path');
+    for (const [k, v] of Object.entries({ d: 'M2 6.5h12M5 1.75v2.5M11 1.75v2.5', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5', 'stroke-linecap': 'round' })) lines.setAttribute(k, v);
+    svg.append(rect, lines);
+    return svg;
+  }
+
   const PERSON_ERRORS = {
     USER_NOT_FOUND: (p) => `Microsoft 365 doesn’t recognize ${p.email || p.key}. If this is on the default list, check the email in api/staff.json.`,
     FORBIDDEN: () => 'The dashboard app isn’t allowed to read Planner tasks yet. A Microsoft 365 admin needs to grant consent.',
@@ -184,10 +196,10 @@
       h('div', { class: 'main' },
         h('p', { class: 'title' }, task.title),
         (task.planTitle || task.bucketTitle) && h('p', { class: 'where' },
-          task.planTitle && h('span', { class: 'plan' }, task.planTitle),
-          task.bucketTitle && h('span', { class: 'bucket' }, task.bucketTitle))),
+          task.planTitle && h('span', { class: 'plan' }, h('span', { class: 'label' }, 'Plan: '), task.planTitle),
+          task.bucketTitle && h('span', { class: 'bucket' }, h('span', { class: 'label' }, 'Bucket: '), task.bucketTitle))),
       h('div', { class: 'side' },
-        day && h('span', { class: 'due' }, shortDate(day, today)),
+        day && h('span', { class: 'due' }, calendarIcon(), shortDate(day, today)),
         day && isOpen && h('span', { class: 'rel' }, relativeLabel(diff)),
         isOpen && (task.priorityLabel === 'Urgent' || task.priorityLabel === 'Important') &&
           h('span', { class: `flag flag-${task.priorityLabel.toLowerCase()}` }, task.priorityLabel),
