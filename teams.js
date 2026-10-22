@@ -54,7 +54,7 @@
       response = await window.fetch(url, {
         ...init,
         redirect: 'manual',
-        headers: { ...(init.headers || {}), Authorization: `Bearer ${bearer}` },
+        headers: { ...(init.headers || {}), 'X-Teams-Token': bearer },
       });
     } catch (err) {
       if (!retried) return authFetch(url, init, true);
