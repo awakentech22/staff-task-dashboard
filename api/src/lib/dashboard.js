@@ -1,6 +1,6 @@
 'use strict';
 
-const { listUserTasks, getPlanTitle, getBucketTitle } = require('./graph');
+const { listUserTasks, getPlanInfo, getBucketTitle } = require('./graph');
 const { shapeTask, selectTasks } = require('./shape');
 
 const MAX_CACHE_ENTRIES = 200;
@@ -59,8 +59,11 @@ function loadPerson(person, { completedDays, now, ttlMs, log }) {
 
 /**
  * people: [{ key, name, email? }] where key is an Entra object ID or an email.
+ * onlyCreatedBy: when set (an Entra object ID), only tasks in plans created by
+ * that person are returned. Tasks in other plans, or in plans whose creator
+ * cannot be determined, are left out and counted in hiddenCount.
  */
-async function buildDashboard({ people, completedDays = 14, now = Date.now(), ttlMs = 0, log = () => {} }) {
+async function buildDashboard({ people, completedDays = 14, now = Date.now(), ttlMs = 0, log = () => {}, onlyCreatedBy = null }) {
   const fetched = await mapLimit(people, 3, async (person) => ({
     person,
     ...(await loadPerson(person, { completedDays, now, ttlMs, log })),
@@ -75,28 +78,42 @@ async function buildDashboard({ people, completedDays = 14, now = Date.now(), tt
     }
   }
 
-  const planTitles = new Map();
+  const planInfos = new Map();
   const bucketTitles = new Map();
   await Promise.all([
-    mapLimit([...planIds], 5, async (id) => planTitles.set(id, await getPlanTitle(id))),
+    mapLimit([...planIds], 5, async (id) => planInfos.set(id, await getPlanInfo(id))),
     mapLimit([...bucketIds], 5, async (id) => bucketTitles.set(id, await getBucketTitle(id))),
   ]);
 
   return {
     generatedAt: new Date(now).toISOString(),
     completedDays,
-    people: fetched.map(({ person, selected, error }) => ({
-      key: person.key,
-      name: person.name || person.email || person.key,
-      email: person.email || null,
-      error: error || null,
-      tasks: (selected || []).map((task) =>
-        shapeTask(task, {
-          planTitle: planTitles.get(task.planId),
-          bucketTitle: bucketTitles.get(task.bucketId),
-        })
-      ),
-    })),
+    people: fetched.map(({ person, selected, error }) => {
+      const all = selected || [];
+      const wanted = onlyCreatedBy ? onlyCreatedBy.toLowerCase() : null;
+      const visible = wanted
+        ? all.filter((task) => {
+            const info = planInfos.get(task.planId);
+            return Boolean(info && info.createdById && info.createdById.toLowerCase() === wanted);
+          })
+        : all;
+      const hiddenCount = all.filter((t) => !(t.percentComplete >= 100)).length
+        - visible.filter((t) => !(t.percentComplete >= 100)).length;
+      return {
+        key: person.key,
+        name: person.name || person.email || person.key,
+        email: person.email || null,
+        error: error || null,
+        hiddenCount,
+        tasks: visible.map((task) => {
+          const info = planInfos.get(task.planId);
+          return shapeTask(task, {
+            planTitle: info && info.title,
+            bucketTitle: bucketTitles.get(task.bucketId),
+          });
+        }),
+      };
+    }),
   };
 }
 
