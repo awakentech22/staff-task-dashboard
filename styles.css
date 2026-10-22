@@ -52,7 +52,6 @@ body {
   letter-spacing: -0.03em;
   text-transform: uppercase;
 }
-.source { margin: 0.4rem 0 0; font-size: 0.875rem; color: var(--bone); }
 
 .actions {
   display: flex;
@@ -172,12 +171,12 @@ main {
 .where {
   display: flex;
   flex-wrap: wrap;
-  gap: 0 0.9rem;
-  margin: 0.15rem 0 0;
+  gap: 0.1rem 1rem;
+  margin: 0.2rem 0 0;
   font-size: 0.875rem;
   color: var(--muted);
 }
-.bucket { color: var(--muted); font-style: italic; }
+.where .label { font-weight: 700; color: var(--ink); }
 
 .side {
   display: flex;
@@ -187,7 +186,18 @@ main {
   text-align: end;
   font-size: 0.875rem;
 }
-.due { font-weight: 700; white-space: nowrap; }
+.due {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.15rem 0.55rem;
+  border: 1.5px solid var(--ink);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.icon { inline-size: 0.875rem; block-size: 0.875rem; flex: none; }
+.is-overdue .due { color: var(--ember-text); border-color: var(--ember); }
+.is-done .due { color: var(--muted); border-color: var(--line); font-weight: 600; }
 .rel { color: var(--muted); }
 .is-overdue .rel { color: var(--ember-text); font-weight: 600; }
 .flag { font-weight: 700; }
