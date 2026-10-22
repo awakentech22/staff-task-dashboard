@@ -113,6 +113,7 @@ main {
   text-transform: uppercase;
 }
 .count { margin: 0.45rem 0 0.9rem; color: var(--muted); font-size: 0.9375rem; }
+.note { margin: -0.5rem 0 0.9rem; color: var(--muted); font-size: 0.8125rem; }
 
 /* The load line: one bar showing how a person's open work splits by urgency. */
 .load {
