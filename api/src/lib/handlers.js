@@ -1,13 +1,9 @@
 'use strict';
 
-const fs = require('fs');
-const path = require('path');
 const { buildDashboard } = require('./dashboard');
 const { parseRequest } = require('./request');
 const { resolveViewerId } = require('./viewer');
 const { searchUsers } = require('./graph');
-
-const STAFF_FILE = path.join(__dirname, '..', '..', 'staff.json');
 
 function settings() {
   const cacheSeconds = Number(process.env.CACHE_SECONDS) > 0 ? Number(process.env.CACHE_SECONDS) : 60;
@@ -15,24 +11,15 @@ function settings() {
   return { cacheSeconds, completedDays };
 }
 
-/** The list shown until a viewer chooses their own people. */
-function loadDefaultPeople() {
-  const parsed = JSON.parse(fs.readFileSync(STAFF_FILE, 'utf8'));
-  return (parsed.people || [])
-    .filter((person) => person && (person.userId || person.email))
-    .map((person) => ({
-      key: person.userId || person.email,
-      name: person.name || person.email,
-      email: person.email || null,
-    }));
-}
-
 /**
  * Shared by /api/tasks (browser) and /api/teams/tasks (Teams). The caller has
  * already been authenticated and checked against the viewer list.
  *
- * GET  -> the default staff list
- * POST -> { people: [{ key, name }] | null, onlyMine } (max 8 people)
+ * There is no default list: the viewer chooses the people. With no people
+ * chosen the answer is an empty list, and nothing is read from Planner.
+ *
+ * POST -> { people: [{ key, name }], onlyMine } (max 8 people)
+ * GET  -> an empty list
  */
 async function tasksResponse(request, context, principal) {
   let people = null;
@@ -46,6 +33,19 @@ async function tasksResponse(request, context, principal) {
   }
 
   const { cacheSeconds, completedDays } = settings();
+  if (!people || people.length === 0) {
+    return {
+      status: 200,
+      headers: { 'Cache-Control': 'no-store' },
+      jsonBody: {
+        generatedAt: new Date().toISOString(),
+        completedDays,
+        people: [],
+        filter: { onlyMine, applied: false, error: null },
+      },
+    };
+  }
+
   try {
     let viewerId = null;
     if (onlyMine) {
@@ -57,7 +57,7 @@ async function tasksResponse(request, context, principal) {
     }
 
     const payload = await buildDashboard({
-      people: people || loadDefaultPeople(),
+      people,
       completedDays,
       ttlMs: cacheSeconds * 1000,
       log: (message) => context.log(message),
@@ -90,4 +90,4 @@ async function peopleResponse(request, context) {
   }
 }
 
-module.exports = { tasksResponse, peopleResponse, loadDefaultPeople };
+module.exports = { tasksResponse, peopleResponse };
