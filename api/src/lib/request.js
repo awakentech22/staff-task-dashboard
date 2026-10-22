@@ -33,4 +33,11 @@ function parsePeople(body) {
   return { people };
 }
 
-module.exports = { parsePeople, MAX_PEOPLE };
+/** Full POST body: the people list plus the "only plans I created" switch (on unless explicitly false). */
+function parseRequest(body) {
+  const parsed = parsePeople(body);
+  if (parsed.error) return parsed;
+  return { people: parsed.people, onlyMine: !(body && body.onlyMine === false) };
+}
+
+module.exports = { parsePeople, parseRequest, MAX_PEOPLE };
